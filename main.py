@@ -178,15 +178,7 @@ class SiteWrap:
 
             print("wysyłam żądanie... ", end='')
             print({"data": dane_post}, self.cookies)
-            #r = requests.post(url=url, json={"data": dane_post}, cookies=self.cookies)
-            #if ".NETAPPASPXAUTH" in r.cookies:
-            #    self.cookies[".NETAPPASPXAUTH"] = r.cookies[".NETAPPASPXAUTH"]
-
-            #if r.status_code == 200:
-            #    print("ok")
-            #else:
-            #    print(f"jakiś błąd - Lp. {dane[0]}")
-
+            r = requests.post(url=url, json={"data": dane_post}, cookies=self.cookies)
 
         print("Lista błędów:")
         for blad in niepowodzenia:
