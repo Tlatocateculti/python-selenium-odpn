@@ -147,12 +147,12 @@ class SiteWrap:
 
     def _extract_ids(self, data: dict):
         """Wyodrębnij ID z danych"""
-        self.ID_szkid = "152"#data.get('szkid')
-        self.ID_rok = "2025"#data.get('rok')
-        self.ID_miesiac = "12"#data.get('miesiac')
-        self.ID_rozdzial = "80116"#data.get('rozdzial')
-        self.ID_Dokumentu = "15"#data.get('IdDokumentu')
-        self.IDWydruk = "7"#data.get('wydrukId')
+        self.ID_szkid = data.get('szkid')
+        self.ID_rok = data.get('rok')
+        self.ID_miesiac = data.get('miesiac')
+        self.ID_rozdzial = data.get('rozdzial')
+        self.ID_Dokumentu = data.get('IdDokumentu')
+        self.IDWydruk = data.get('wydrukId')
 
     def _extract_field_names(self, v_store_fields: list):
         """Wyodrębnij nazwy pól"""
