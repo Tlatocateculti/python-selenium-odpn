@@ -72,6 +72,8 @@ class SiteWrap:
             # Pobranie logów performance z Chrome
             logs = self.driver.get_log("performance")
             captured_data = []
+
+            REQUIRED_FIELDS = {'szkid', 'rok', 'miesiac', 'rozdzial', 'IdDokumentu', 'wydrukId'}
             
             for log_entry in logs:
                 try:
@@ -96,6 +98,16 @@ class SiteWrap:
                             try:
                                 # Parsowanie danych POST
                                 post_data = json.loads(request_data['postData'])
+
+                                continueSearch = False
+                                
+                                for field in REQUIRED_FIELDS:
+                                    if post_data['data'].get(field) is None:
+                                        continueSearch = True
+                                        break
+
+                                if continueSearch == True:
+                                    continue
                                 
                                 if 'data' in post_data:
                                     self._extract_ids(post_data['data'])
@@ -135,12 +147,12 @@ class SiteWrap:
 
     def _extract_ids(self, data: dict):
         """Wyodrębnij ID z danych"""
-        self.ID_szkid = data.get('szkid')
-        self.ID_rok = data.get('rok')
-        self.ID_miesiac = data.get('miesiac')
-        self.ID_rozdzial = data.get('rozdzial')
-        self.ID_Dokumentu = data.get('IdDokumentu')
-        self.IDWydruk = data.get('wydrukId')
+        self.ID_szkid = "152"#data.get('szkid')
+        self.ID_rok = "2025"#data.get('rok')
+        self.ID_miesiac = "12"#data.get('miesiac')
+        self.ID_rozdzial = "80116"#data.get('rozdzial')
+        self.ID_Dokumentu = "15"#data.get('IdDokumentu')
+        self.IDWydruk = "7"#data.get('wydrukId')
 
     def _extract_field_names(self, v_store_fields: list):
         """Wyodrębnij nazwy pól"""
@@ -228,9 +240,9 @@ class SiteWrap:
         try:
             # Kliknięcie głównego menu
             menu_exe = WebDriverWait(self.driver, self.wait_time).until(
-                EC.element_to_be_clickable((By.CSS_SELECTOR, "#ext-gen43"))
+                EC.element_to_be_clickable((By.XPATH, "//em[contains(@class, 'x-unselectable')]//button[contains(text(), 'Rozliczenie dotacji')]"))
             )
-            menu_exe.click()
+            menu_exe.click()            
             
             # Wybór rozdziału jeśli określony
             if self.szkola_rozdzial != 0:
@@ -427,14 +439,3 @@ if __name__ == "__main__":
         site.select_bills()
         site.capture_response("all")
         site.parse_file()
-    
-    # Lub tradycyjne użycie
-    # site = SiteWrap("czestochowa.odpn.pl")
-    # try:
-    #     site.login("", "")
-    #     site.get_headers()
-    #     site.select_bills()
-    #     site.capture_response("all")
-    #     site.parse_file()
-    # finally:
-    #     site.driver.quit()
