@@ -338,6 +338,7 @@ class SiteWrap:
             pelna_kwota = self._parse_amount(dane[3])
             kwota_dotacji = self._parse_amount(dane[7])
             kwota_orzeczenia = self._parse_amount(dane[8])
+            kwota_orzeczenia_rozliczona = self._parse_amount(dane[9])
             
             dane_post = {
                 "Id": str(nr_pozycji[1]),
@@ -359,7 +360,8 @@ class SiteWrap:
                 dane_post[self.fields_name[4]] = f"{dane[6].strip()}T00:00:00"  # data_platnosci
                 dane_post[self.fields_name[5]] = kwota_dotacji     # kwota_z_dotacji
                 dane_post[self.fields_name[6]] = kwota_orzeczenia  # kwota_orzeczenia
-            
+                dane_post[self.fields_name[7]] = kwota_orzeczenia_rozliczona  # NOWE pole
+                print(dane_post)
             return dane_post
             
         except (IndexError, ValueError) as e:
@@ -438,4 +440,4 @@ if __name__ == "__main__":
         site.get_headers()
         site.select_bills()
         site.capture_response("all")
-        site.parse_file()
+        site.parse_file("")
