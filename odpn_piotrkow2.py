@@ -191,6 +191,7 @@ class SiteWrap:
 
     def select_school(self, szk_id: int):
         """Zmiana placówki przez POST request"""
+        print('Zmieniam placówkę...')
         try:
             url = f"https://{self.host}/Common/ZmianaPlacowki/ZmianaPlacowki_Resp.aspx"
             payload = {
@@ -207,6 +208,7 @@ class SiteWrap:
                     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
                 }
             )
+            print(response)
             response.raise_for_status()
             print(f"✓ Zmiana placówki na ID={szk_id} - status: {response.status_code}")
             # Odśwież stronę po zmianie
@@ -258,9 +260,10 @@ class SiteWrap:
         """Nawigacja do formularza rozliczenia z wyborem szkoły"""
         try:
             self.close_notification_if_present()
-            
+            print(school_name)
             #Wybór szkoły jeśli podana
             if school_name:
+                print('Próba zmiany placówki')
                 success = self.select_school(school_name)
                 if not success:
                     print("Kontynuuję bez zmiany szkoły")
@@ -273,16 +276,19 @@ class SiteWrap:
             WebDriverWait(self.driver, self.wait_time).until(
                 EC.presence_of_element_located((By.CLASS_NAME, "x-grid3-scroller"))
             )
+            print("Czekam na bazę")
             #Czekanie aż pojawi się "bazowy" z lewej strony
             bazowy_title = WebDriverWait(self.driver, self.wait_time).until(
-                EC.element_to_be_clickable((By.XPATH, "//div[contains(@class, 'x-grid-group-title') and normalize-space(text())='bazowy']"))
+                EC.element_to_be_clickable((By.XPATH, f"//div[contains(@class, 'x-grid-group-title') and normalize-space(text())]"))
+                #EC.element_to_be_clickable((By.XPATH, "//div[contains(@class, 'x-grid-group-title')"))
             )
             # Scroll + kliknięcie na title (nie na body!)
             self.driver.execute_script("arguments[0].scrollIntoView(true);", bazowy_title)
             time.sleep(0.5)
+            print("Czekam na miesiące", bazowy_title.text.strip()) 
             # Czekaj na rozwinięcie (pojawi się x-grid-group-body)
             WebDriverWait(self.driver, self.wait_time).until(
-                EC.presence_of_element_located((By.XPATH, "//div[contains(@class, 'x-grid-group-body') and ancestor::div[contains(@class, 'x-grid-group') and .//div[contains(text(), 'bazowy')]]]"))
+                EC.presence_of_element_located((By.XPATH, f"//div[contains(@class, 'x-grid-group-body') and ancestor::div[contains(@class, 'x-grid-group') and .//div[contains(text(), '{bazowy_title.text.strip()}')]]]"))
             )
             print("✓ Wybrano rozdział 'bazowy'")
             
@@ -324,13 +330,19 @@ class SiteWrap:
             print(f"Błąd przełączania na miesiąc {miesiac_tekst}: {e}")
             raise
 
-    def parse_file(self, wydatki_file_name: Optional[str] = None, encoding: str = "utf-8"):
+    def parse_file(self, wydatki_file_name: Optional[str] = None, szkolaID = None, encoding: str = "utf-8"):
         """Parsowanie pliku CSV z wydatkami - NOWA LOGIKA DLA MIESIĘCY"""
         url = f'https://{self.host}/ODPN/Szkoly/RozliczenieDotacji/Kontrolki/Taby/Dokument/Dokument.asmx/SubmitForm'
-        numery_pol = {
-            '1.': (2, -1), '2.': (22, -2), '3.': (23, -3),
-            '4.': (24, -4), '5.': (25, -5), '6.': (26, -6), '7.': (27, -7)
-        }
+        numery_pol = None
+        if szkolaID == None or szkolaID == 272:
+            numery_pol = {
+                '1.': (2, -1), '2.': (12, -2), '3.': (13, -3)
+            }
+        else:
+            numery_pol = {
+                '1.': (2, -1), '2.': (22, -2), '3.': (23, -3),
+                '4.': (24, -4), '5.': (25, -5), '6.': (26, -6), '7.': (27, -7)
+            } 
         niepowodzenia = []
         file_path = Path(wydatki_file_name or f"wydatki_{self.ID_rozdzial}.csv")
         
@@ -519,9 +531,9 @@ if __name__ == "__main__":
             config = json.load(f)
     except:
         print('Nie otworzono wskazanego pliku')
-    
+    print(config)
     with SiteWrap("piotrkow-trybunalski.odpn.pl") as site:
         site.login(config.get('login') if config else "", config.get('haslo') if config else "")  # ręczne logowanie
         site.get_headers()
         site.select_bills(config.get('szkolaID') if config else 0)  #podany numer to numer placówki
-        site.parse_file("wydatki_test.csv")  #sztywna nazwa pliku do parsowania
+        site.parse_file("wydatki_mm2.csv", config.get('szkolaID'))  #sztywna nazwa pliku do parsowania
