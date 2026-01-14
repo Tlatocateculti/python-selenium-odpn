@@ -130,7 +130,7 @@ class SiteWrap:
                                 
                 except (json.JSONDecodeError, KeyError):
                     continue
-            
+            #self.originalPostData = captured_data
             output_file = Path(f"{file_name}.json")
             with output_file.open("w", encoding='utf-8') as f:
                 json.dump(captured_data, f, indent=2, ensure_ascii=False)
@@ -353,6 +353,100 @@ class SiteWrap:
             print(f"Błąd przełączania na miesiąc {miesiac_tekst}: {e}")
             raise
 
+    def clear_all_documents(self, rozdzial = None):
+        """Kasuje WSZYSTKIE dokumenty z zakładki Dokumenty przez POST API"""
+        url = f"https://{self.host}/ODPN/Szkoly/RozliczenieDotacji/Kontrolki/Taby/Dokument/Dokument.asmx/GridDeleteRow"
+        #niepowodzenia = []
+        for miesiac_num in ('01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12'):
+            print(f"\n=== PRZETWARZAM MIESIĄC {self.miesiace_map[miesiac_num]} ({miesiac_num}) ===")
+            
+            try:
+                # Przełącz na miesiąc + Dokumenty + capture
+                self.switch_to_month_and_documents(miesiac_num, rozdzial)
+                self.capture_response(f"capture_{miesiac_num}")
+                #print(self.originalPostData)
+                #posts = json.load(self.originalPostData)
+                posts = None
+                try:
+                    config_path = Path(f"capture_{miesiac_num}.json")
+                    with config_path.open('r', encoding='utf-8') as f:
+                        posts = json.load(f)[0]['postData']['data']
+                        print(posts)
+                except Exception as e:
+                    print('Nie otworzono wskazanego pliku', e)
+                time.sleep(10)
+                try:
+                    print("🗑️ Rozpoczynam kasowanie wszystkich dokumentów...")
+
+                    # 2. Znajdź wszystkie wiersze dokumentów (ID z kolumny x-grid3-col-2)
+                    row_ids = []
+                    rows = self.driver.find_elements(By.XPATH, 
+                        "//div[contains(@class, 'x-grid3-row') and not(contains(@class, 'x-grid3-row-checker'))]"
+                    )
+                    
+                    for row in rows:
+                        try:
+                            # Szukamy ukrytej kolumny x-grid3-col-2 (ID dokumentu)
+                            id_elem = row.find_element(By.XPATH, 
+                                ".//td[contains(@class, 'x-grid3-td-2')]//div[contains(@class, 'x-grid3-cell-inner')]"
+                            )
+                            row_id = id_elem.get_attribute('textContent').strip()
+                            #print(id_elem, row_id)
+                            if row_id and row_id.isdigit():  # np. "28677"
+                                row_ids.append(int(row_id))
+                                print(f"  Znaleziono dokument ID: {row_id}")
+                        except Exception as e:
+                            continue  # Wiersz bez ID (np. wiersz grupujący)
+                    if not row_ids:
+                        print("✓ Brak dokumentów do usunięcia")
+                        return True
+                    print(f"🎯 Znaleziono {len(row_ids)} dokumentów do usunięcia")
+                    # 3. Przygotuj payload (wzór z Twojego przykładu)
+                    for row_id in row_ids:
+                        dane_post = {
+                            "data": {
+                                "groupDir": "ASC",
+                                "wydrukId": self.IDWydruk,
+                                "IdDokumentu": self.ID_Dokumentu,
+                                "szkid": self.ID_szkid,
+                                "rok": self.ID_rok,
+                                "miesiac": self.ID_miesiac,
+                                "rozdzial": self.ID_rozdzial,
+                                "v_store_filters": [],
+                                "v_store_filters_autoRemoteSearch": posts.get("v_store_filters_autoRemoteSearch"),
+                                "v_store_filters_addInfo": [],
+                                "v_store_fields": posts.get("v_store_fields"),
+                                "v_store_groupField": posts.get("v_store_groupField"),
+                                "v_store_groupDir": posts.get("v_store_groupDir"),
+                                "sort": posts.get("sort"),
+                                "dir": posts.get("dir"),
+                                "jsonData": [row_id]  # pojedyncze ID
+                            }
+                        }
+                        cookies = {c['name']: c['value'] for c in self.driver.get_cookies()}
+                        headers = {
+                            'Content-Type': 'application/json; charset=UTF-8',
+                            'X-Requested-With': 'XMLHttpRequest'
+                        }
+                        url = f"https://{self.host}/ODPN/Szkoly/RozliczenieDotacji/Kontrolki/Taby/Dokument/Dokument.asmx/GridDeleteRow"
+                        #inne ciastka...
+                        success = requests.post(url, json=dane_post, headers=headers, cookies=cookies, timeout=30)    
+                        
+                        #success = self._send_request(url, dane_post)
+                        if success:
+                            print("✓")
+                        else:
+                            print("✗")
+                        time.sleep(1)
+                except Exception as e:
+                    print(f"❌ Wyjątek podczas kasowania: {e}")
+                    self.driver.save_screenshot("error_clear_documents.png")
+                    import traceback
+                    traceback.print_exc()
+                    return False
+            except Exception as e:
+                print(f"✗ Błąd przetwarzania miesiąca {miesiac_num}: {e}")
+
     def parse_file(self, wydatki_file_name: Optional[str] = None, szkolaID = None, rozdzial = None, encoding: str = "utf-8"):
         """Parsowanie pliku CSV z wydatkami - NOWA LOGIKA DLA MIESIĘCY"""
         url = f'https://{self.host}/ODPN/Szkoly/RozliczenieDotacji/Kontrolki/Taby/Dokument/Dokument.asmx/SubmitForm'
@@ -573,14 +667,17 @@ if __name__ == "__main__":
     
     config = None
     try:
-        config_path = Path("SzkolaDane.json")
+        config_path = Path("./BelchatowDane.json")
         with config_path.open('r', encoding='utf-8') as f:
             config = json.load(f)
-    except:
-        print('Nie otworzono wskazanego pliku')
+    except Exception as e:
+        print('Nie otworzono wskazanego pliku', e)
     print(config)
-    with SiteWrap("powiat-belchatowski.odpn.pl") as site:
+    with SiteWrap(config.get('strona') or "") as site:
         site.login(config.get('login') if config else "", config.get('haslo') if config else "")  # ręczne logowanie
         site.get_headers()
         site.select_bills(config.get('rozdzial'), config.get('szkolaID') if config else 0)  #podany numer to numer placówki
-        site.parse_file(f"belchatow_test2.csv", config.get('szkolaID'), config.get('rozdzial'))  #sztywna nazwa pliku do parsowania
+        if config.get('akcja') == 'USUN':
+            site.clear_all_documents(config.get('rozdzial'))
+        else:
+            site.parse_file(config.get('plik') if config else "belchatow.csv", config.get('szkolaID'), config.get('rozdzial'))  #sztywna nazwa pliku do parsowania
